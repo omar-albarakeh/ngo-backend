@@ -271,7 +271,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors());
+app.use(cors({ origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app" }));
 app.use(express.json());
 
 // Send PayPal client ID to frontend
