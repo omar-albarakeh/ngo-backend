@@ -210,54 +210,83 @@
 //   console.log(`Server running on port ${PORT}`);
 // });
 
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
+// import express from "express";
+// import cors from "cors";
+
+// dotenv.config();
+
+// const app = express();
+// const PORT = process.env.PORT || 5000;
+
+// app.use(
+//   cors({
+//     origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
+//   })
+// );
+
+// app.use(express.json());
+
+// // Simple endpoint to provide PayPal client ID
+// app.get("/config/paypal", (req, res) => {
+//   res.json({
+//     clientId: process.env.PAYPAL_CLIENT_ID,
+//   });
+// });
+
+// // Handle PayPal webhook events
+// app.post("/paypal-webhook", express.json(), (req, res) => {
+//   console.log("Received PayPal webhook:", req.body);
+
+//   const eventType = req.body.event_type;
+//   const resource = req.body.resource;
+
+//   if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+//     console.log("Payment completed:", {
+//       transactionId: resource.id,
+//       amount: resource.amount.value,
+//       currency: resource.amount.currency_code,
+//       payerEmail: resource.payer.email_address,
+//     });
+//   }
+
+//   res.status(200).send("OK");
+// });
+
+// // Basic health check
+// app.get("/health", (req, res) => {
+//   res.status(200).json({ status: "OK" });
+// });
+
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 
 dotenv.config();
-
+console.log("PAYPAL_CLIENT_ID:", process.env.PAYPAL_CLIENT_ID);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(
-  cors({
-    origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
-// Simple endpoint to provide PayPal client ID
+// Send PayPal client ID to frontend
 app.get("/config/paypal", (req, res) => {
+  res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
+});
+
+// Send EmailJS config to frontend
+app.get("/config/emailjs", (req, res) => {
   res.json({
-    clientId: process.env.PAYPAL_CLIENT_ID,
+    serviceId: process.env.EMAILJS_SERVICE_ID,
+    templateId: process.env.EMAILJS_TEMPLATE_ID,
+    publicKey: process.env.EMAILJS_PUBLIC_KEY,
   });
 });
 
-// Handle PayPal webhook events
-app.post("/paypal-webhook", express.json(), (req, res) => {
-  console.log("Received PayPal webhook:", req.body);
-
-  const eventType = req.body.event_type;
-  const resource = req.body.resource;
-
-  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
-    console.log("Payment completed:", {
-      transactionId: resource.id,
-      amount: resource.amount.value,
-      currency: resource.amount.currency_code,
-      payerEmail: resource.payer.email_address,
-    });
-  }
-
-  res.status(200).send("OK");
-});
-
-// Basic health check
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK" });
-});
-
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running at http://localhost:${PORT}`);
 });
