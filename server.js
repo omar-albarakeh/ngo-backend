@@ -20,7 +20,8 @@ let silverPricePerGram = null;
 const fetchPrices = async () => {
   const API_URL =
     "https://gold.g.apised.com/v1/latest?metals=XAU,XAG&base_currency=EUR&currencies=EUR&weight_unit=gram";
-  const API_KEY = "sk_9043e49278394b8D5e9dA786CC77d24e2647991DE6C66994";
+  const API_KEY = process.env.GOLD_API_KEY;
+
 
   try {
     const response = await fetch(API_URL, {
@@ -85,6 +86,11 @@ app.get("/config/emailjs", (req, res) => {
     publicKey: process.env.EMAILJS_PUBLIC_KEY,
   });
 });
+
+app.get("/", (req, res) => {
+  res.send("NGO backend is running.");
+});
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
