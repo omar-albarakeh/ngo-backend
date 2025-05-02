@@ -261,31 +261,148 @@
 // app.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
+///////////workde code ////////
+// import express from "express";
+// import cors from "cors";
+// import dotenv from "dotenv";
 
+// dotenv.config();
+
+// const app = express();
+// const PORT = process.env.PORT || 10000;
+
+// app.use(cors({ origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app" }));
+// app.use(express.json());
+
+// // Send PayPal client ID to frontend
+// app.get("/config/paypal", (req, res) => {
+//   res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
+// });
+
+// // Send EmailJS config to frontend
+// app.get("/config/emailjs", (req, res) => {
+//   res.json({
+//     serviceId: process.env.EMAILJS_SERVICE_ID,
+//     templateId: process.env.EMAILJS_TEMPLATE_ID,
+//     publicKey: process.env.EMAILJS_PUBLIC_KEY,
+//   });
+// });
+
+// app.listen(PORT, () => {
+//   console.log(`Server is running at http://localhost:${PORT}`);
+// });
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fetch from "node-fetch";
+import cron from "node-cron";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Middleware
 app.use(cors({ origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app" }));
 app.use(express.json());
 
-// Send PayPal client ID to frontend
+// --- METAL PRICES LOGIC START ---
+let goldPricePerGram = null;
+let silverPricePerGram = null;
+
+const fetchPrices = async () => {
+  const API_URL =
+    "https://gold.g.apised.com/v1/latest?metals=XAU,XAG&base_currency=EUR&currencies=EUR&weight_unit=gram";
+  const API_KEY = process.env.GOLD_API_KEY;
+
+  try {
+    const response = await fetch(API_URL, {
+      headers: {
+        "x-api-key": API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const { XAU, XAG } = data?.data?.metal_prices || {};
+
+    if (!XAU?.price || !XAG?.price) {
+      throw new Error("Missing metal prices in API response");
+    }
+
+    goldPricePerGram = XAU.price;
+    silverPricePerGram = XAG.price;
+
+    console.log("Updated metal prices:", {
+      goldPricePerGram,
+      silverPricePerGram,
+    });
+  } catch (err) {
+    console.error("Error fetching metal prices:", err.message);
+  }
+};
+
+fetchPrices();
+cron.schedule("0 */12 * * *", fetchPrices);
+
+app.get("/api/metal-prices", async (req, res) => {
+  if (goldPricePerGram === null || silverPricePerGram === null) {
+    await fetchPrices();
+  }
+
+  if (goldPricePerGram !== null && silverPricePerGram !== null) {
+    res.json({ goldPricePerGram, silverPricePerGram });
+  } else {
+    res.status(503).json({ error: "Prices not available yet" });
+  }
+});
+// --- METAL PRICES LOGIC END ---
+
+// PayPal Config Endpoint
 app.get("/config/paypal", (req, res) => {
   res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
 });
 
-// Send EmailJS config to frontend
+// PayPal Webhook
+app.post("/paypal-webhook", (req, res) => {
+  console.log("Received PayPal webhook:", req.body);
+
+  const eventType = req.body.event_type;
+  const resource = req.body.resource;
+
+  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+    console.log("Payment completed:", {
+      transactionId: resource.id,
+      amount: resource.amount.value,
+      currency: resource.amount.currency_code,
+      payerEmail: resource.payer.email_address,
+    });
+  }
+
+  res.status(200).send("OK");
+});
+
+// EmailJS Config Endpoint
 app.get("/config/emailjs", (req, res) => {
   res.json({
     serviceId: process.env.EMAILJS_SERVICE_ID,
     templateId: process.env.EMAILJS_TEMPLATE_ID,
     publicKey: process.env.EMAILJS_PUBLIC_KEY,
   });
+});
+
+// Health Check
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
+});
+
+// Root Route
+app.get("/", (req, res) => {
+  res.send("NGO backend is running.");
 });
 
 app.listen(PORT, () => {
