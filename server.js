@@ -1,8 +1,11 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fetch from "node-fetch";
+import cron from "node-cron";
 
-dotenv.config(); // Only once at the top
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,12 +13,71 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Send PayPal client ID to frontend
+// --- METAL PRICES LOGIC START ---
+let goldPricePerGram = null;
+let silverPricePerGram = null;
+
+const fetchPrices = async () => {
+  const API_URL =
+    "https://gold.g.apised.com/v1/latest?metals=XAU,XAG&base_currency=EUR&currencies=EUR&weight_unit=gram";
+  const API_KEY = "sk_9043e49278394b8D5e9dA786CC77d24e2647991DE6C66994";
+
+  try {
+    const response = await fetch(API_URL, {
+      headers: {
+        "x-api-key": API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const { XAU, XAG } = data?.data?.metal_prices || {};
+
+    if (!XAU?.price || !XAG?.price) {
+      throw new Error("Missing metal prices in API response");
+    }
+
+    goldPricePerGram = XAU.price;
+    silverPricePerGram = XAG.price;
+
+    console.log("Updated metal prices:", {
+      goldPricePerGram,
+      silverPricePerGram,
+    });
+  } catch (err) {
+    console.error("Error fetching metal prices:", err.message);
+  }
+};
+
+// Initial fetch
+fetchPrices();
+
+// Schedule fetch every 12 hours
+cron.schedule("0 */12 * * *", fetchPrices);
+
+// Endpoint to serve metal prices
+app.get("/api/metal-prices", async (req, res) => {
+  if (goldPricePerGram === null || silverPricePerGram === null) {
+    await fetchPrices();
+  }
+
+  if (goldPricePerGram !== null && silverPricePerGram !== null) {
+    res.json({ goldPricePerGram, silverPricePerGram });
+  } else {
+    res.status(503).json({ error: "Prices not available yet" });
+  }
+});
+// --- METAL PRICES LOGIC END ---
+
+// PayPal Config Endpoint
 app.get("/config/paypal", (req, res) => {
   res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
 });
 
-// Send EmailJS config to frontend
+// EmailJS Config Endpoint
 app.get("/config/emailjs", (req, res) => {
   res.json({
     serviceId: process.env.EMAILJS_SERVICE_ID,
@@ -25,7 +87,5 @@ app.get("/config/emailjs", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running at http://localhost:${PORT}`);
-  console.log("PayPal Client ID:", process.env.PAYPAL_CLIENT_ID);
-  console.log("EmailJS Service ID:", process.env.EMAILJS_SERVICE_ID);
+  console.log(`Server is running on port ${PORT}`);
 });
