@@ -261,12 +261,13 @@
 // app.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
 dotenv.config();
-console.log("PAYPAL_CLIENT_ID:", process.env.PAYPAL_CLIENT_ID);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
