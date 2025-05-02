@@ -295,19 +295,48 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import fetch from "node-fetch";
+import paypal from "@paypal/paypal-server-sdk";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import cron from "node-cron";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Use Helmet to secure HTTP headers
+app.use(helmet());
+
+// Use express-rate-limit to avoid abuse (limits to 100 requests per 15 minutes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests, please try again later.",
+});
+app.use(limiter);
+
+// Enable CORS for specific frontend URL
 app.use(cors({ origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app" }));
-app.use(express.json());
 
-// --- METAL PRICES LOGIC START ---
+// Parse incoming requests
+app.use(express.json({ type: "application/json" }));
+
+// Middleware to capture raw body for signature verification
+app.use((req, res, next) => {
+  let data = "";
+  req.on("data", (chunk) => {
+    data += chunk;
+  });
+  req.on("end", () => {
+    req.rawBody = data;
+    next();
+  });
+});
+
+// Metal prices logic
 let goldPricePerGram = null;
 let silverPricePerGram = null;
 
@@ -346,9 +375,69 @@ const fetchPrices = async () => {
   }
 };
 
+// Initial fetch and schedule every 12 hours
 fetchPrices();
 cron.schedule("0 */12 * * *", fetchPrices);
 
+// Webhook route
+app.post("/paypal-webhook", async (req, res) => {
+  try {
+    const headers = req.headers;
+    const transmissionId = headers["paypal-transmission-id"];
+    const transmissionTime = headers["paypal-transmission-time"];
+    const certUrl = headers["paypal-cert-url"];
+    const authAlgo = headers["paypal-auth-algo"];
+    const transmissionSig = headers["paypal-transmission-sig"];
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+    const webhookEventBody = req.rawBody;
+
+    // Verify signature
+    const verifyResponse = await fetch(
+      "https://api-m.paypal.com/v1/notifications/verify-webhook-signature",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+          ).toString("base64")}`,
+        },
+        body: JSON.stringify({
+          auth_algo: authAlgo,
+          cert_url: certUrl,
+          transmission_id: transmissionId,
+          transmission_sig: transmissionSig,
+          transmission_time: transmissionTime,
+          webhook_id: webhookId,
+          webhook_event: JSON.parse(webhookEventBody),
+        }),
+      }
+    );
+
+    const verification = await verifyResponse.json();
+
+    if (verification.verification_status === "SUCCESS") {
+      const event = JSON.parse(webhookEventBody);
+      if (event.event_type === "PAYMENT.CAPTURE.COMPLETED") {
+        console.log("✅ Payment completed:", {
+          transactionId: event.resource.id,
+          amount: event.resource.amount.value,
+          currency: event.resource.amount.currency_code,
+          payerEmail: event.resource.payer.email_address,
+        });
+      }
+      res.status(200).send("Webhook verified.");
+    } else {
+      console.warn("❌ Webhook verification failed.");
+      res.status(400).send("Invalid signature.");
+    }
+  } catch (err) {
+    console.error("Webhook error:", err.message);
+    res.status(500).send("Server error.");
+  }
+});
+
+// Metal Prices Endpoint
 app.get("/api/metal-prices", async (req, res) => {
   if (goldPricePerGram === null || silverPricePerGram === null) {
     await fetchPrices();
@@ -360,51 +449,20 @@ app.get("/api/metal-prices", async (req, res) => {
     res.status(503).json({ error: "Prices not available yet" });
   }
 });
-// --- METAL PRICES LOGIC END ---
 
 // PayPal Config Endpoint
 app.get("/config/paypal", (req, res) => {
   res.json({ clientId: process.env.PAYPAL_CLIENT_ID });
 });
 
-// PayPal Webhook
-app.post("/paypal-webhook", (req, res) => {
-  console.log("Received PayPal webhook:", req.body);
-
-  const eventType = req.body.event_type;
-  const resource = req.body.resource;
-
-  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
-    console.log("Payment completed:", {
-      transactionId: resource.id,
-      amount: resource.amount.value,
-      currency: resource.amount.currency_code,
-      payerEmail: resource.payer.email_address,
-    });
-  }
-
-  res.status(200).send("OK");
-});
-
-// EmailJS Config Endpoint
-app.get("/config/emailjs", (req, res) => {
-  res.json({
-    serviceId: process.env.EMAILJS_SERVICE_ID,
-    templateId: process.env.EMAILJS_TEMPLATE_ID,
-    publicKey: process.env.EMAILJS_PUBLIC_KEY,
-  });
-});
-
-// Health Check
+// Health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
 
-// Root Route
-app.get("/", (req, res) => {
-  res.send("NGO backend is running.");
-});
-
+// Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running at http://localhost:${PORT}`);
+  console.log(
+    `✅ Secure PayPal webhook server with metal prices running on port ${PORT}`
+  );
 });
