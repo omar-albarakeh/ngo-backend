@@ -221,7 +221,7 @@ const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: "https://ngo-backend-p0rc.onrender.com",
+    origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
   })
 );
 
