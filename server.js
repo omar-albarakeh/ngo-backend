@@ -322,6 +322,7 @@ app.use(limiter);
 const allowedOrigins = [
   "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
   "http://localhost:5173",
+  "https://ngo-backend-p0rc.onrender.com",
 ];
 
 app.use(
