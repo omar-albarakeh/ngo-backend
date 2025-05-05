@@ -291,6 +291,7 @@
 // app.listen(PORT, () => {
 //   console.log(`Server is running at http://localhost:${PORT}`);
 // });
+// });
 // server.js
 import express from "express";
 import cors from "cors";
@@ -318,8 +319,22 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Enable CORS for specific frontend URL
-app.use(cors({ origin: "https://ngo-v3-omars-projects-52eaefc2.vercel.app" }));
+const allowedOrigins = [
+  "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
+  "https://http://localhost:5173",
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  })
+);
 
 // Parse incoming requests
 app.use(express.json({ type: "application/json" }));
