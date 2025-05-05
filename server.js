@@ -321,7 +321,7 @@ app.use(limiter);
 
 const allowedOrigins = [
   "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
-  "https://http://localhost:5173",
+  "http://localhost:5173",
 ];
 
 app.use(
