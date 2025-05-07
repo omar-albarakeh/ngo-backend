@@ -25,6 +25,31 @@ const limiter = rateLimit({
 app.use(limiter);
 
 const allowedOrigins = [
+  "https://www.soshumanistes.fr",
+  "http://www.soshumanistes.fr",
+  "https://soshumanistes.fr",
+  "http://soshumanistes.fr",
+
+  "https://www.soshumanistes.com",
+  "http://www.soshumanistes.com",
+  "https://soshumanistes.com",
+  "http://soshumanistes.com",
+
+  "https://www.soshumanistes.org",
+  "http://www.soshumanistes.org",
+  "https://soshumanistes.org",
+  "http://soshumanistes.org",
+
+  "https://www.soshumanistes.ch",
+  "http://www.soshumanistes.ch",
+  "https://soshumanistes.ch",
+  "http://soshumanistes.ch",
+
+  "https://www.sospalestine.fr",
+  "http://www.sospalestine.fr",
+  "https://sospalestine.fr",
+  "http://sospalestine.fr",
+
   "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
   "http://localhost:5173",
   "https://ngo-backend-p0rc.onrender.com",
