@@ -8,7 +8,7 @@ import paypal from "@paypal/paypal-server-sdk";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cron from "node-cron";
-import { sendEmail } from "./utils/emailService.js";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
@@ -28,7 +28,7 @@ const allowedOrigins = [
   "https://ngo-v3-omars-projects-52eaefc2.vercel.app",
   "http://localhost:5173",
   "https://ngo-backend-p0rc.onrender.com",
-  "http://test.sospalestine.fr", 
+  "http://test.sospalestine.fr",
 ];
 
 app.use(
@@ -177,6 +177,35 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK" });
 });
 
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: process.env.SMTP_PORT === "465", // Use true for SSL (465) and false for TLS (587)
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Modify your sendEmail function to use SMTP
+const sendEmail = async ({ to, subject, html }) => {
+  const mailOptions = {
+    from: process.env.SMTP_USER,
+    to,
+    subject,
+    html,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Message sent:", info.messageId);
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw error;
+  }
+};
+
+// Example route using the updated sendEmail
 app.post("/subscribe", async (req, res) => {
   const { email } = req.body;
 
