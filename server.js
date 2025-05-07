@@ -42,6 +42,7 @@ app.use(
     },
   })
 );
+app.use(express.json({ type: "application/json" }));
 app.use((req, res, next) => {
   let data = "";
   req.on("data", (chunk) => {
@@ -52,8 +53,6 @@ app.use((req, res, next) => {
     next();
   });
 });
-
-app.use(express.json({ type: "application/json" }));
 
 // Metal prices logic
 let goldPricePerGram = null;
